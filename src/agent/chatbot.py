@@ -1,0 +1,68 @@
+"""
+Chatbot Baseline — Gọi LLM 1 lần duy nhất, KHÔNG có tool.
+Baseline so sánh với ReAct Agent trong lĩnh vực nghiên cứu học thuật.
+Không có tool → có thể hallucinate thông tin bài báo cụ thể.
+Dùng local model: Phi-3-mini-4k-instruct-q4.gguf
+"""
+import os
+import sys
+from typing import Optional
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
+
+from dotenv import load_dotenv
+from src.core.local_provider import LocalProvider
+from src.telemetry.logger import logger
+
+load_dotenv()
+
+SYSTEM_PROMPT = """Ban la tro ly nghien cuu hoc thuat thong minh, ho tro sinh vien va nha nghien cuu tim hieu bai bao khoa hoc.
+Ban co kien thuc ve cac linh vuc: NLP, Computer Vision, Reinforcement Learning, Education Technology.
+Hay tra loi ngan gon, hoc thuat, bang tieng Viet.
+LUU Y: Ban khong co cong cu tim kiem, vi vay cau tra loi dua tren kien thuc tong quat cua ban."""
+
+
+def run_chatbot(user_input: str, system_prompt: Optional[str] = None) -> dict:
+    """
+    Chạy chatbot baseline: 1 system prompt + 1 lần gọi LLM cục bộ (Phi-3-mini).
+    system_prompt: nếu có, ghi đè SYSTEM_PROMPT mặc định.
+    Returns: dict chứa content, usage, latency_ms
+    """
+    logger.log_event("CHATBOT_START", {"input": user_input})
+
+    effective_prompt = system_prompt if system_prompt else SYSTEM_PROMPT
+
+    model_path = os.getenv("LOCAL_MODEL_PATH", "")
+    if not model_path:
+        base = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.normpath(os.path.join(base, "../../models/Phi-3-mini-4k-instruct-q4.gguf"))
+
+    llm = LocalProvider(model_path=model_path, n_ctx=4096)
+    result = llm.generate(user_input, system_prompt=effective_prompt)
+
+    logger.log_event("CHATBOT_END", {
+        "output": result["content"][:200],
+        "usage": result["usage"],
+        "latency_ms": result["latency_ms"],
+    })
+
+    return result
+
+
+# Run directly
+if __name__ == "__main__":
+    print("=" * 60)
+    print("CHATBOT BASELINE - Tro Ly Nghien Cuu Hoc Thuat")
+    print("=" * 60)
+
+    test_queries = [
+        "Attention mechanism trong Transformer la gi?",
+        "BERT va GPT khac nhau nhu the nao?",
+    ]
+
+    for query in test_queries:
+        print(f"\n[User]: {query}")
+        result = run_chatbot(query)
+        print(f"[Chatbot]: {result['content']}")
+        print(f"  >> {result['latency_ms']:.0f}ms | {result['usage']['total_tokens']} tokens")
+        print("-" * 60)
