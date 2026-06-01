@@ -248,7 +248,4 @@ VÍ DỤ SAI (HALLUCINATION): ...
   - Multi-agent system: SearchAgent + AnalysisAgent + CompareAgent phối hợp qua orchestrator
   - Supervisor Agent để audit quyết định và phát hiện hallucination
 
----
 
-> [!NOTE]
-> Submit this report by renaming it to `GROUP_REPORT_[TEAM_NAME].md` and placing it in this folder.

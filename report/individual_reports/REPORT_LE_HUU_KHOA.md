@@ -188,7 +188,3 @@ Observation (kết quả tool trả về) **thay đổi hướng suy luận** c�
 - **Multi-Agent System**: Tách thành các agent chuyên biệt (SearchAgent, DetailAgent, CompareAgent) phối hợp qua orchestrator để xử lý song song các bước độc lập
 - **RAG Integration**: Kết hợp Retrieval-Augmented Generation để agent truy xuất nội dung full-text bài báo thực (PDF), không chỉ metadata mock
 
----
-
-> [!NOTE]
-> Submit this report by renaming it to `REPORT_[YOUR_NAME].md` and placing it in this folder.
