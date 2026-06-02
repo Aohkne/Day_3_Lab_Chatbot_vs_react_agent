@@ -9,15 +9,3 @@ pydantic>=2.0.0
 
 # Testing
 pytest>=7.4.0
-
-# Optional — only needed if using cloud providers (not required for local mode)
-# openai>=1.0.0
-# google-generativeai>=0.5.0
-
-# Setup (conda ml env):
-#   conda activate ml
-#   pip install -r requirements.txt
-#
-# For llama-cpp-python on macOS (Metal GPU):
-#   CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python --upgrade --force-reinstall --no-cache-dir
-
