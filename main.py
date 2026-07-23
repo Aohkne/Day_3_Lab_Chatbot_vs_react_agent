@@ -1,6 +1,7 @@
 """
 main.py — So sanh 3 approach tren 5 test cases nghien cuu hoc thuat.
-Model: Phi-3-mini-4k-instruct-q4.gguf (local, khong can internet)
+Provider (openai | google | local) chon qua DEFAULT_PROVIDER trong .env,
+mac dinh "local" (Phi-3-mini-4k-instruct-q4.gguf, khong can internet).
 Chay: python main.py
 """
 import os
@@ -10,7 +11,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dotenv import load_dotenv
-from src.core.local_provider import LocalProvider
+from src.core.llm_provider import LLMProvider
+from src.core.provider_factory import get_provider
 from src.agent.chatbot import run_chatbot
 from src.agent.agent import ReActAgent
 from src.agent.agent_v1 import ReActAgentV1
@@ -53,17 +55,16 @@ TEST_CASES = [
 ]
 
 
-def get_local_llm() -> LocalProvider:
-    """Khoi tao local LLM (Phi-3-mini). Dung chung cho ca 3 approach."""
-    model_path = os.getenv("LOCAL_MODEL_PATH", "")
-    if not model_path:
-        model_path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "models", "Phi-3-mini-4k-instruct-q4.gguf",
-        )
-    model_path = os.path.normpath(model_path)
-    print(f"  [Model] {model_path}")
-    return LocalProvider(model_path=model_path, n_ctx=4096)
+def get_llm() -> LLMProvider:
+    """
+    Khoi tao LLMProvider dung chung cho ca 3 approach (Chatbot/Agent/Agent V1).
+    Provider duoc chon qua bien moi truong DEFAULT_PROVIDER (openai|google|local,
+    mac dinh "local") — doi provider chi can sua .env, khong can sua code o day.
+    """
+    provider_name = os.getenv("DEFAULT_PROVIDER", "local")
+    llm = get_provider(provider_name=provider_name)
+    print(f"  [Provider] {provider_name} | [Model] {llm.model_name}")
+    return llm
 
 
 def run_chatbot_test(query: str) -> dict:
@@ -77,7 +78,7 @@ def run_chatbot_test(query: str) -> dict:
     }
 
 
-def run_agent_test(llm: LocalProvider, query: str) -> dict:
+def run_agent_test(llm: LLMProvider, query: str) -> dict:
     agent = ReActAgent(llm=llm, tools=TOOLS, max_steps=5)
     result = agent.run(query)
     return {
@@ -89,7 +90,7 @@ def run_agent_test(llm: LocalProvider, query: str) -> dict:
     }
 
 
-def run_agent_v1_test(llm: LocalProvider, query: str) -> dict:
+def run_agent_v1_test(llm: LLMProvider, query: str) -> dict:
     agent = ReActAgentV1(llm=llm, tools=TOOLS, max_steps=4)
     result = agent.run(query)
     return {
@@ -109,17 +110,23 @@ def main():
     sep()
     print("  LAB 3: CHATBOT vs REACT AGENT vs AGENT V1")
     print("  Domain  : Academic Research Assistant")
-    print("  Model   : Phi-3-mini-4k-instruct-q4.gguf (Local, no internet)")
-    print("  Env     : conda activate ml")
+    print("  Provider: chon qua DEFAULT_PROVIDER trong .env (openai | google | local)")
     sep()
 
-    print("\n[INIT] Loading local LLM...")
+    print("\n[INIT] Loading LLM provider...")
     try:
-        llm = get_local_llm()
-        print("  [OK] Model loaded!\n")
+        llm = get_llm()
+        print("  [OK] Provider ready!\n")
     except FileNotFoundError as exc:
         print(f"  [ERROR] {exc}")
-        print("  Make sure models/Phi-3-mini-4k-instruct-q4.gguf exists.")
+        print("  Neu dung provider 'local', dam bao models/Phi-3-mini-4k-instruct-q4.gguf ton tai.")
+        sys.exit(1)
+    except ValueError as exc:
+        print(f"  [ERROR] {exc}")
+        sys.exit(1)
+    except ModuleNotFoundError as exc:
+        print(f"  [ERROR] {exc}")
+        print("  Chay 'pip install -r requirements.txt' de cai dat dependency cua provider dang chon.")
         sys.exit(1)
 
     all_results = []

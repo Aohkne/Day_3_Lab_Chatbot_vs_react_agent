@@ -4,8 +4,7 @@
 - **Team Members**:
   | Họ và Tên | MSSV | Module phụ trách |
   | :--- | :--- | :--- |
-  | Lê Hữu Khoa | 2A202600863 | `agent.py`, `agent_v1.py`, `chatbot.py` |
-  | Nguyễn Đức Thành | 2A202600955 | `src/tools/research_tools.py` |
+  | Lê Hữu Khoa | 2A202600863 | `agent.py`, `agent_v1.py`, `chatbot.py`, `src/tools/research_tools.py` |
   | Trần Tiến Đạt | 2A202600978 | `main.py` |
   | Hồ Trọng Nhật Minh | 2A202600768 | `web_demo.py` |
 - **Deployment Date**: 2026-06-01
@@ -25,15 +24,13 @@ Hệ thống **Academic Research Assistant** so sánh ba cách tiếp cận đ�
 
 ### 1.1 Team Contributions (Phân chia công việc)
 
-Dự án được phân chia thành 4 module chuyên biệt, tương ứng với 4 thành viên trong nhóm để tối ưu hóa hiệu suất và dễ dàng triển khai:
+Dự án được phân chia thành 3 module chuyên biệt, tương ứng với 3 thành viên trong nhóm để tối ưu hóa hiệu suất và dễ dàng triển khai:
 
-1. **Lê Hữu Khoa — 2A202600863 (Team Lead & Core Agent)**: Chịu trách nhiệm thiết kế thuật toán cốt lõi cho ReAct Agent. Viết System Prompt, vòng lặp suy luận Thought-Action-Observation, cơ chế phát hiện lỗi parse, RULE chống hallucination nghiêm ngặt (RULE 1–6) và logic phân biệt câu hỏi khái niệm vs. câu hỏi DB-specific (RULE 4 trigger). Đồng thời xây dựng Chatbot baseline với `LocalProvider`. *(Phụ trách: `src/agent/agent.py`, `src/agent/agent_v1.py`, `src/agent/chatbot.py`)*
+1. **Lê Hữu Khoa — 2A202600863 (Team Lead & Core Agent / Tooling)**: Chịu trách nhiệm thiết kế thuật toán cốt lõi cho ReAct Agent. Viết System Prompt, vòng lặp suy luận Thought-Action-Observation, cơ chế phát hiện lỗi parse, RULE chống hallucination nghiêm ngặt (RULE 1–6) và logic phân biệt câu hỏi khái niệm vs. câu hỏi DB-specific (RULE 4 trigger). Đồng thời xây dựng Chatbot baseline với `LocalProvider`, thiết kế 3 tools nghiên cứu học thuật (`search_papers`, `get_paper_details`, `compare_papers`) và mock PAPER_DB gồm 10 bài báo khoa học thực tế (Transformer, BERT, GPT-3, ResNet, ViT, RAG, ...) với đầy đủ metadata: citations, quality score, research gaps, DOI. *(Phụ trách: `src/agent/agent.py`, `src/agent/agent_v1.py`, `src/agent/chatbot.py`, `src/tools/research_tools.py`)*
 
-2. **Nguyễn Đức Thành — 2A202600955 (Tooling & Data Engineer)**: Thiết kế 3 tools nghiên cứu học thuật (`search_papers`, `get_paper_details`, `compare_papers`) và xây dựng mock PAPER_DB gồm 10 bài báo khoa học thực tế (Transformer, BERT, GPT-3, ResNet, ViT, RAG, ...) với đầy đủ metadata: citations, quality score, research gaps, DOI. Viết logic keyword matching và filter theo năm/lĩnh vực. *(Phụ trách: `src/tools/research_tools.py`)*
+2. **Trần Tiến Đạt — 2A202600978 (QA / Evaluation Engineer)**: Thiết lập môi trường thử nghiệm so sánh 3 approach trên 5 test case học thuật chuẩn hóa (Agent-Favorable, Chatbot-Favorable, Edge Case hallucination test). Viết script benchmark tự động đo Latency, Token usage, Steps cho cả Chatbot, Agent và Agent V1 rồi in kết quả dạng bảng ra terminal. *(Phụ trách: `main.py`)*
 
-3. **Trần Tiến Đạt — 2A202600978 (QA / Evaluation Engineer)**: Thiết lập môi trường thử nghiệm so sánh 3 approach trên 5 test case học thuật chuẩn hóa (Agent-Favorable, Chatbot-Favorable, Edge Case hallucination test). Viết script benchmark tự động đo Latency, Token usage, Steps cho cả Chatbot, Agent và Agent V1 rồi in kết quả dạng bảng ra terminal. *(Phụ trách: `main.py`)*
-
-4. **Hồ Trọng Nhật Minh — 2A202600768 (Frontend & System Dev)**: Thiết kế và xây dựng giao diện Web Demo phong cách Neo Brutalism (Flask). Tích hợp cả 3 approach (Chatbot / Agent / Agent V1) vào một UI duy nhất với thread-safe shared LLM instance và mutex lock. Hiển thị Trace log (Thought-Action-Observation) trực tiếp trên trình duyệt để minh họa luồng suy nghĩ của AI. *(Phụ trách: `web_demo.py`)*
+3. **Hồ Trọng Nhật Minh — 2A202600768 (Frontend & System Dev)**: Thiết kế và xây dựng giao diện Web Demo phong cách Neo Brutalism (Flask). Tích hợp cả 3 approach (Chatbot / Agent / Agent V1) vào một UI duy nhất với thread-safe shared LLM instance và mutex lock. Hiển thị Trace log (Thought-Action-Observation) trực tiếp trên trình duyệt để minh họa luồng suy nghĩ của AI. *(Phụ trách: `web_demo.py`)*
 
 ---
 
@@ -92,9 +89,10 @@ Return Answer to User
 
 ### 2.3 LLM Providers Used
 
-- **Primary**: `gemma-4-26b-a4b-it` (Google Gemini API — `GeminiProvider`)
-- **Secondary**: `deepseek-v4-flash` (OpenAI-compatible API — `OpenAIProvider`)
-- **Local (Offline)**: `Phi-3-mini-4k-instruct-q4.gguf` (llama-cpp-python — `LocalProvider`)
+- **Primary (benchmarked)**: `Phi-3-mini-4k-instruct-q4.gguf` (llama-cpp-python — `LocalProvider`), chạy offline, dùng cho toàn bộ 5 test case trong `main.py`
+- **Secondary (hỗ trợ, chưa benchmark định lượng)**: `gemini-1.5-flash` (`GeminiProvider`) và `gpt-4o` (`OpenAIProvider`) — chưa chạy benchmark định lượng do giới hạn API key/quota trong lúc làm lab
+
+**Provider Switching**: `src/core/provider_factory.py` cung cấp hàm `get_provider()` — đọc biến môi trường `DEFAULT_PROVIDER` (`openai` | `google` | `local`) trong `.env` và trả về đúng instance `LLMProvider` tương ứng. `chatbot.py` và `main.py` đều gọi qua factory này thay vì hard-code `LocalProvider`, nên đổi provider chỉ cần sửa `.env`, không phải sửa code ở agent/chatbot. `tests/test_provider_factory.py` xác nhận factory dispatch đúng class theo từng giá trị `DEFAULT_PROVIDER` và raise `ValueError` rõ ràng khi tên provider không hợp lệ.
 
 ---
 
@@ -248,4 +246,17 @@ VÍ DỤ SAI (HALLUCINATION): ...
   - Multi-agent system: SearchAgent + AnalysisAgent + CompareAgent phối hợp qua orchestrator
   - Supervisor Agent để audit quyết định và phát hiện hallucination
 
+---
+
+## 9. Testing & Code Quality
+
+Bổ sung `tests/` với 3 file test thuần logic, không phụ thuộc model thật nên chạy được ở mọi môi trường (kể cả máy không có `llama-cpp-python`/`google-generativeai` cài sẵn — các test yêu cầu package đó tự `skip` thay vì fail):
+
+| File | Nội dung |
+| :--- | :--- |
+| `tests/test_research_tools.py` | 9 test cho `search_papers`/`compare_papers`/`get_paper_details`: tìm đúng theo keyword, lọc theo khoảng năm, thông báo rõ ràng khi không tìm thấy, ID không hợp lệ. |
+| `tests/test_agent.py` | 5 test cho vòng lặp ReAct dùng `ScriptedLLM` (fake `LLMProvider` trả response lập trình sẵn): tool-call → Final Answer, parse-error được ghi nhận và loop tiếp tục, timeout đúng ở `max_steps`, RULE 4 của Agent V1 chặn Final Answer khi chưa gọi tool, và bỏ qua RULE 4 với câu hỏi khái niệm tổng quát. |
+| `tests/test_provider_factory.py` | 5 test cho `get_provider()`: dispatch đúng class theo `provider_name`/`DEFAULT_PROVIDER`, và raise `ValueError` khi tên provider không hợp lệ. |
+
+`ScriptedLLM` (trong `test_agent.py`) là một `LLMProvider` giả lập implement `generate()`/`stream()` để trả về chuỗi response đã biết trước — nhờ đó test được logic parse Action/Final Answer, RULE 4, và xử lý timeout của `agent.py`/`agent_v1.py` một cách xác định (deterministic), không phụ thuộc vào việc model thật trả lời đúng/sai ngẫu nhiên.
 

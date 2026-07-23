@@ -12,9 +12,12 @@
 
 | File | Vai trò |
 | :--- | :--- |
-| `src/agent/chatbot.py` | Baseline: 1 lần gọi LLM, không tool, dùng `LocalProvider` (Phi-3-mini) |
+| `src/agent/chatbot.py` | Baseline: 1 lần gọi LLM, không tool |
 | `src/agent/agent.py` | ReAct Agent cơ bản: vòng lặp Thought-Action-Observation, tối đa 5 bước |
 | `src/agent/agent_v1.py` | ReAct Agent V1: thêm 6 RULE chống hallucination nghiêm ngặt, tối đa 4 bước |
+| `src/tools/research_tools.py` | 3 tools (`search_papers`, `get_paper_details`, `compare_papers`) + mock `PAPER_DB` 10 bài báo |
+| `src/core/provider_factory.py` | Factory `get_provider()` — chọn `OpenAIProvider`/`GeminiProvider`/`LocalProvider` qua biến môi trường `DEFAULT_PROVIDER`, để `chatbot.py`/`main.py` swap provider mà không cần sửa code |
+| `tests/test_agent.py`, `tests/test_research_tools.py`, `tests/test_provider_factory.py` | Test suite (19 test) dùng fake `LLMProvider` (`ScriptedLLM`) để kiểm chứng logic parse/RULE 4/timeout một cách xác định, không phụ thuộc model thật |
 
 ### Code Highlights
 
@@ -137,7 +140,7 @@ Step trước đó (step 2) xuất ra:
    conversation += f"\n{ai_response}\nObservation: {obs_truncated}\n"
    ```
 
-2. **Chuyển sang cloud API** — Khi test với `gemma-4-26b-a4b-it` (Gemini), parse error giảm hẳn: agent hoàn thành trong 1–2 steps thay vì timeout tại step 4. (Log: `AGENT_V1_END steps=2 tokens=2655`)
+2. **Chuyển sang cloud API** — Khi test với `gemini-1.5-flash` (Gemini), parse error giảm hẳn: agent hoàn thành trong 1–2 steps thay vì timeout tại step 4. (Log: `AGENT_V1_END steps=2 tokens=2655`)
 
 ---
 

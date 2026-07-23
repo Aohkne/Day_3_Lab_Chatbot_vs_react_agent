@@ -2,76 +2,54 @@
 
 - **Student Name**: Hồ Trọng Nhật Minh
 - **Student ID**: 2A202600768
-- **Date**: 01/06/2026
+- **Date**: 2026-06-01
 
 ---
 
 ## I. Technical Contribution (15 Points)
 
-Trong bài tập Lab 3 này, tôi chịu trách nhiệm chính trong việc cấu trúc lại toàn bộ hệ thống lõi Agent nhằm chuyển đổi từ kịch bản mẫu sang chủ đề **Retail Tinh Gọn (Trợ lý Kiểm tra Kho & Tính giá Đơn hàng Đa kênh)**, đồng thời hiện thực hóa các khối logic rẽ nhánh tự động.
+Tôi phụ trách xây dựng **Web Demo** (`web_demo.py`) — giao diện Flask phong cách Neo Brutalism cho phép so sánh trực quan cả 3 cách tiếp cận (Chatbot / ReAct Agent / Agent V1) trên cùng một câu hỏi, hiển thị song song 3 cột kết quả kèm trace suy luận.
 
-- **Modules Implementated**: `src/agent/agent.py`, và phát triển công cụ thực nghiệm `chatbot_baseline.py`, `run_retail_demo.py`.
-- **Code Highlights**: 
-    * **Cơ chế rẽ nhánh thông minh theo dữ liệu công cụ đầu vào:**
-        ```python
-        if not self.tools:
-            # CHẾ ĐỘ 1: CHATBOT THƯỜNG - Duy trì lịch sử hội thoại liên tục
-            self.history.append({"role": "user", "content": user_input})
-            ...
-            return bot_response
-        ```
-    * **Tầng phòng vệ tham số (Fault-Tolerant Argument Parser):** Tôi đã lập trình bộ bóc tách chuỗi linh hoạt tại hàm `_execute_tool` để làm sạch dấu ngoặc/nháy và tự động xử lý/eval các biểu thức toán học dạng chuỗi do mô hình nhỏ (SLM) sinh ra, tránh làm sập vòng lặp.
-- **Documentation**: Khi danh sách công cụ trống, hệ thống tự động đưa ngữ cảnh hội thoại vào mảng `self.history` để `Phi-3` nhớ tên và ngành học của sinh viên ở lượt chat sau. Khi có công cụ, hệ thống sẽ chèn chuỗi chỉ thị ép cấu trúc `Thought -> Action -> Observation` để kích hoạt vòng lặp tuần hoàn cho đến khi nhận diện được từ khóa `Final Answer:`.
+- **Modules Implemented**: `web_demo.py`
+- **Code Highlights**:
+  - **3 endpoint riêng biệt, gọi song song từ frontend**: `/ask/chatbot`, `/ask/agent`, `/ask/agentv1` — mỗi endpoint khởi tạo đúng approach tương ứng (`run_chatbot`, `ReActAgent`, `ReActAgentV1`) và trả JSON gồm `answer`, `tokens`, `latency_ms`, `steps`, `trace`.
+  - **Shared LLM instance + Lock vì llama-cpp-python không thread-safe**:
+    ```python
+    _llm_instance: LocalProvider = None
+    _llm_lock = threading.Lock()
+
+    def get_llm() -> LocalProvider:
+        global _llm_instance
+        if _llm_instance is None:
+            _llm_instance = LocalProvider(model_path=model_path, n_ctx=4096)
+        return _llm_instance
+    ```
+    Model Phi-3 chỉ được load 1 lần (singleton), mọi lệnh gọi `generate()`/`agent.run()` đều bọc trong `with _llm_lock:` để tránh 2 request đồng thời cùng ghi vào 1 context của `Llama` object.
+  - **Custom System Prompt**: cho phép người dùng ghi đè hoàn toàn system prompt của Chatbot, hoặc nối thêm `extra_instructions` vào cuối prompt gốc của Agent/Agent V1 (giữ nguyên định dạng `Thought/Action/Observation/Final Answer` bắt buộc để không phá vỡ parser).
+  - **`_build_trace()`**: chuyển raw trace (`list[dict]` chứa `llm_output` thô) thành JSON gọn — tách riêng `thought`, `action`, `observation`, `final_answer`, `constraint` — để render từng bước suy luận trực tiếp trên trình duyệt (nút "Xem quá trình suy luận").
 
 ---
 
 ## II. Debugging Case Study (10 Points)
 
-Tôi đã phân tích và giải quyết thành công hai sự cố kỹ thuật nghiêm trọng trong quá trình phát triển thông qua hệ thống telemetry log:
+### Vấn đề: Race condition khi nhiều request cùng lúc gọi vào 1 instance `Llama`
 
-### 1. Sự cố sập chỉ thị phần cứng trên Windows (Lỗi 0xc000001d)
-- **Problem Description**: Tiến trình chạy thử nghiệm cục bộ bị ngắt lập tức với lỗi `Windows Error 0xc000001d (STATUS_ILLEGAL_INSTRUCTION)`.
-- **Diagnosis**: Bộ phân phối binary mặc định của thư viện `llama-cpp-python` cố tình sử dụng tập lệnh toán học ma trận nâng cao (AVX2/AVX512) vượt quá tập lệnh mà CPU hiện tại của máy host hỗ trợ hoặc bị Windows ngăn chặn.
-- **Solution**: Chạy lệnh xóa sạch bộ nhớ đệm ẩn (`pip cache purge`) và hạ cấp chỉ định rõ gói dựng sẵn tương thích cao ổn định `llama-cpp-python==0.2.90`.
-
-### 2. Sự cố lặp bẫy tham số của mô hình ngôn ngữ nhỏ (SLM Parameter Loop)
-- **Problem Description**: Ở phiên bản thử nghiệm đầu tiên, Agent bị kẹt và báo lỗi `calculate_shipping() missing 1 required positional argument` ở Step 3 và Step 4, dẫn đến việc cạn kiệt lượt chạy (`max_steps = 5`) và trả về kết quả thất bại.
-- **Log Trace**:
-  ```json
-  [Step 3] Action: calculate_shipping('Hà Nội', (2 * 0 bonet's weight))
-  Observation: Error executing tool calculate_shipping...
-  [Step 4] Action: calculate_shipping('Hà Nội', (2 * 0.25))
-  Observation: Error executing tool calculate_shipping...
-  ```
-- **Diagnosis**: Mô hình Phi-3 gặp giới hạn về số lượng tham số khi tự tính toán khối lượng vật lý. Thay vì truyền một chuỗi thô, nó cố tình đóng mở ngoặc đơn toán học khiến bộ lọc Regex hiểu nhầm toàn bộ cụm phía sau là một đối số duy nhất.
-- **Solution**: Tôi đã tối ưu hóa lại Tool Description trong get_item_price để định nghĩa rõ ràng cấu trúc dữ liệu đầu ra và nâng cấp hàm _execute_tool để tự động làm sạch ký tự ngoặc () và eval biểu thức số học hộ LLM. Đồng thời nâng mức trần ranh giới an toàn max_steps lên mức 8. Kết quả ở lượt chạy sau, Agent đã tự sửa sai thành công tại Step 5 và kết thúc hoàn hảo.
-
-<!-- - **Problem Description**: [e.g., Agent caught in an infinite loop with `Action: search(None)`]
-- **Log Source**: [Link or snippet from `logs/YYYY-MM-DD.log`]
-- **Diagnosis**: [Why did the LLM do this? Was it the prompt, the model, or the tool spec?]
-- **Solution**: [How did you fix it? (e.g., updated `Thought` examples in the system prompt)] -->
+- **Problem Description**: Khi mở 2 tab trình duyệt và gửi câu hỏi gần như đồng thời, ứng dụng chạy với `threaded=True` của Flask xử lý 2 request song song trên 2 thread khác nhau, nhưng cả hai cùng gọi `generate()` trên **cùng một object `Llama`** (được load 1 lần cho tiết kiệm RAM/thời gian init).
+- **Diagnosis**: `llama-cpp-python` không đảm bảo thread-safety cho một instance `Llama` dùng chung — hai lệnh `self.llm(...)` gọi đồng thời có thể ghi đè context nội bộ (KV-cache) của nhau, dẫn đến câu trả lời bị trộn lẫn giữa 2 câu hỏi khác nhau, hoặc trong trường hợp xấu hơn crash tiến trình.
+- **Solution**: Thêm `_llm_lock = threading.Lock()` ở scope module, bọc **mọi** lời gọi `llm.generate()` / `agent.run()` (cả 3 endpoint) trong `with _llm_lock:`. Việc này serializes tất cả các lượt inference — chỉ 1 request được chạy model tại một thời điểm, các request khác phải đợi — đổi lấy độ chính xác và ổn định thay vì throughput đồng thời cao. Đây là đánh đổi hợp lý cho một demo cục bộ (single-user hoặc vài người dùng cùng lúc trong buổi demo).
 
 ---
 
 ## III. Personal Insights: Chatbot vs ReAct (10 Points)
 
-*Reflect on the reasoning capability difference.*
-
-1.  **Reasoning**: Khối suy luận Thought đóng vai trò như một không gian nháp (Scratchpad) kích hoạt cơ chế tự kiểm tra của mô hình (Chain-of-Thought). Thay vì lao ngay vào việc đoán từ ngẫu nhiên, Thought giúp Phi-3 định hình rõ ràng lộ trình logic: "Cần kiểm kho trước $\rightarrow$ Lấy đơn giá để nhân số lượng $\rightarrow$ Lấy cân nặng để tính ship". Điều này giúp một mô hình nhỏ 3.8B đạt được tỷ lệ xử lý chính xác tương đương các mô hình lớn.
-2.  **Reliability**: Chatbot Baseline không dùng công cụ bộc lộ điểm yếu chết người là Ảo tưởng dữ liệu (Hallucination). Khi nhận câu hỏi tính giá đơn hàng, Chatbot Baseline lập tức tự bịa ra giá tiền áo thun và khẳng định chắc chắn shop còn hàng kèm chính sách freeship Hà Nội. Chatbot thường tệ hơn Agent khi đối mặt với dữ liệu động (kho bãi) và các tác vụ cần tính toán bắc cầu.
-3.  **Observation**: Phản hồi từ môi trường (Observation) đóng vai trò là chiếc mỏ neo giữ mô hình ở lại với thực tế. Khi nhận được dữ liệu thực tế từ hàm Python trả về ở Step 1 (In-stock quantity: 5), LLM lập tức cập nhật trạng thái niềm tin (Belief State) để chuyển sang bước lấy giá ở Step 2 một cách tự tin mà không cần phỏng đoán.
+1. **Reasoning**: Việc hiển thị 3 panel cạnh nhau trên cùng 1 UI làm rõ sự khác biệt về cách "suy nghĩ": panel Chatbot trả lời ngay lập tức không có bước trung gian nào để xem, trong khi panel Agent/Agent V1 có nút trace hiển thị từng `Thought → Action → Observation` — người xem thấy được agent quyết định gọi `search_papers` trước khi trả lời câu hỏi về một bài báo cụ thể, thay vì đoán mò.
+2. **Reliability**: Đặt 3 câu trả lời song song giúp phát hiện hallucination trực quan hơn nhiều so với đọc log — ví dụ với câu hỏi edge case ("tác giả không tồn tại"), panel Chatbot vẫn tự tin đưa ra một câu trả lời nghe hợp lý, trong khi panel Agent V1 hiển thị rõ ràng `Observation: Không tìm thấy` rồi kết luận trung thực "Tôi không tìm thấy thông tin này trong cơ sở dữ liệu."
+3. **Observation**: Vì trace được render trực tiếp trên UI (không chỉ nằm trong file log), người dùng không rành kỹ thuật (ví dụ giảng viên chấm demo) cũng có thể theo dõi được `Observation` từ tool đã thay đổi hướng suy luận của Agent như thế nào ở mỗi bước, thay vì phải đọc JSON log thô.
 
 ---
 
 ## IV. Future Improvements (5 Points)
 
-*How would you scale this for a production-level AI agent system?*
-
-- **Scalability**: Thay thế cơ chế gọi hàm đồng bộ bằng kiến trúc hàng đợi không đồng bộ (Asynchronous Task Queue sử dụng Celery/Redis) cho các hàm gọi tool. Việc này giúp hệ thống không bị nghẽn (Block) khi có hàng ngàn khách hàng cùng check kho một lúc.
-- **Safety**: Áp dụng cơ chế Structured Outputs (ép định dạng JSON Schema thông qua thư viện Pydantic kết hợp với hàm sinh của LLM Provider) thay thế hoàn toàn cho bộ lọc Regex thô hiện tại. Điều này triệt tiêu hoàn toàn lỗi vỡ định dạng chuỗi của LLM.
-- **Performance**: Tích hợp tầng cơ sở dữ liệu vector (Vector DB) để làm kho lưu trữ và trích xuất công cụ (Tool Retrieval). Khi hệ thống Retail mở rộng lên hàng trăm công cụ khác nhau (Mã giảm giá, hoàn tiền, đối tác vận chuyển), Agent chỉ cần bốc các công cụ thực sự liên quan vào ngữ cảnh prompt để tiết kiệm chi phí Token và tối ưu hóa độ trễ Latency.
-
----
-
-> [!NOTE]
-> Submit this report by renaming it to `REPORT_[YOUR_NAME].md` and placing it in this folder.
+- **Scalability**: Thay vì 1 instance `Llama` dùng chung + lock (serialize toàn bộ request), có thể dùng một pool nhỏ các instance model (process pool) để phục vụ nhiều người dùng đồng thời mà không phải xếp hàng chờ từng lượt.
+- **Safety**: Thêm rate limiting và validate độ dài input ở endpoint Flask để tránh một client gửi query cực dài làm tràn context window hoặc gây từ chối dịch vụ cho các client khác đang xếp hàng chờ `_llm_lock`.
+- **Performance**: Chuyển từ response chặn (blocking) sang streaming (SSE/WebSocket) để hiển thị câu trả lời dần dần thay vì đợi toàn bộ vòng lặp ReAct hoàn tất mới trả về, cải thiện trải nghiệm chờ đợi trên UI.

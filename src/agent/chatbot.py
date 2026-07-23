@@ -2,7 +2,7 @@
 Chatbot Baseline — Gọi LLM 1 lần duy nhất, KHÔNG có tool.
 Baseline so sánh với ReAct Agent trong lĩnh vực nghiên cứu học thuật.
 Không có tool → có thể hallucinate thông tin bài báo cụ thể.
-Dùng local model: Phi-3-mini-4k-instruct-q4.gguf
+Provider (OpenAI/Gemini/Local) được chọn qua get_provider() — xem provider_factory.py.
 """
 import os
 import sys
@@ -11,7 +11,7 @@ from typing import Optional
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../"))
 
 from dotenv import load_dotenv
-from src.core.local_provider import LocalProvider
+from src.core.provider_factory import get_provider
 from src.telemetry.logger import logger
 
 load_dotenv()
@@ -22,22 +22,20 @@ Hay tra loi ngan gon, hoc thuat, bang tieng Viet.
 LUU Y: Ban khong co cong cu tim kiem, vi vay cau tra loi dua tren kien thuc tong quat cua ban."""
 
 
-def run_chatbot(user_input: str, system_prompt: Optional[str] = None) -> dict:
+def run_chatbot(user_input: str, system_prompt: Optional[str] = None, provider: Optional[str] = None) -> dict:
     """
-    Chạy chatbot baseline: 1 system prompt + 1 lần gọi LLM cục bộ (Phi-3-mini).
+    Chạy chatbot baseline: 1 system prompt + 1 lần gọi LLM duy nhất.
     system_prompt: nếu có, ghi đè SYSTEM_PROMPT mặc định.
+    provider: "openai" | "google" | "local". Nếu None, đọc từ env DEFAULT_PROVIDER
+              (mặc định "local"). Cho phép swap provider mà không cần sửa code,
+              chỉ cần đổi provider ở đây hoặc trong .env.
     Returns: dict chứa content, usage, latency_ms
     """
-    logger.log_event("CHATBOT_START", {"input": user_input})
+    logger.log_event("CHATBOT_START", {"input": user_input, "provider": provider or os.getenv("DEFAULT_PROVIDER", "local")})
 
     effective_prompt = system_prompt if system_prompt else SYSTEM_PROMPT
 
-    model_path = os.getenv("LOCAL_MODEL_PATH", "")
-    if not model_path:
-        base = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.normpath(os.path.join(base, "../../models/Phi-3-mini-4k-instruct-q4.gguf"))
-
-    llm = LocalProvider(model_path=model_path, n_ctx=4096)
+    llm = get_provider(provider_name=provider)
     result = llm.generate(user_input, system_prompt=effective_prompt)
 
     logger.log_event("CHATBOT_END", {

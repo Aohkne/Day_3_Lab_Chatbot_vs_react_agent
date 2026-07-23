@@ -3,6 +3,10 @@ llama-cpp-python>=0.2.0
 flask>=3.0.0
 python-dotenv>=1.0.0
 
+# Cloud providers (OpenAI / Gemini)
+openai>=1.0.0
+google-generativeai>=0.5.0
+
 # Utilities
 requests>=2.31.0
 pydantic>=2.0.0
